@@ -505,8 +505,8 @@
     <button class="replay" id="replayBtn">read it again</button>
   </section>
 
-  <audio id="voice" preload="metadata"></audio>
-  <audio id="music" preload="metadata"></audio>
+  <audio id="voice" preload="auto"></audio>
+  <audio id="music" preload="auto"></audio>
 </div>
 
 <!-- floating music toggle -->
@@ -862,10 +862,14 @@ var CONFIG = {
   function initMusic() {
     if (!CONFIG.MUSIC_SRC) return;
     bgMusic.src = CONFIG.MUSIC_SRC;
+    bgMusic.preload = "auto";
     bgMusic.volume = 0.45;              // soft and sweet, under the voice note
+    musicOk = true;                      // we have a source — don't wait for canplay
+    document.body.classList.add("has-music");
 
     bgMusic.addEventListener("canplay", function () {
-      if (!musicOk) { musicOk = true; document.body.classList.add("has-music"); }
+      musicOk = true;
+      document.body.classList.add("has-music");
     });
 
     // missing/unplayable file -> never show the button
@@ -889,8 +893,9 @@ var CONFIG = {
     musicBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (bgMusic.paused) {
+        musicStarted = true;
         var pr = bgMusic.play();
-        if (pr && pr.catch) pr.catch(function () {});
+        if (pr && pr.catch) pr.catch(function () { musicStarted = false; });
       } else {
         bgMusic.pause();
       }
@@ -898,12 +903,16 @@ var CONFIG = {
   }
 
   // called from the first tap/heart tap — a user gesture, so allowed
+  // iOS Safari may not fire canplay until play() is called, so never gate on it
   var musicStarted = false;
   function startMusic() {
-    if (!musicOk || musicStarted) return;   // only auto-start once; the \u266a button takes over after
+    if (musicStarted || !CONFIG.MUSIC_SRC) return;   // only auto-start once; the ♪ button takes over after
     musicStarted = true;
     var pr = bgMusic.play();
-    if (pr && pr.catch) pr.catch(function () { /* the \u266a button still works */ });
+    if (pr && pr.catch) pr.catch(function () {
+      // blocked or not ready yet — let a later tap try again
+      musicStarted = false;
+    });
   }
 
   // soft fade-out when the photo slideshow is finished
@@ -1168,7 +1177,7 @@ var CONFIG = {
     burst(e.clientX || W / 2, e.clientY || H / 2, 34);
     show("s2");
     startMusic();
-    setTimeout(tryAutoplayVoice, 300);
+    tryAutoplayVoice();                 // same gesture — iOS blocks delayed play()
     setTimeout(typewrite, 700);
   });
 
